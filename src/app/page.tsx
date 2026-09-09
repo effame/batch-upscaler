@@ -9,7 +9,9 @@ import {
   CheckCircle2, 
   AlertCircle, 
   Loader2, 
-  Archive
+  Archive,
+  Maximize2,
+  X
 } from "lucide-react";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
@@ -19,7 +21,7 @@ interface BatchItem {
   file: File;
   name: string;
   previewUrl: string;
-  status: "idle" | "uploading" | "processing" | "completed" | "error";
+  status: "idle" | "processing" | "completed" | "error";
   error?: string;
   progress: number;
   upscaledBase64?: string;
@@ -36,6 +38,7 @@ export default function Home() {
   const [removeBg, setRemoveBg] = useState<boolean>(false);
   const [isBatchProcessing, setIsBatchProcessing] = useState<boolean>(false);
   const [isZipping, setIsZipping] = useState<boolean>(false);
+  const [previewModalItem, setPreviewModalItem] = useState<BatchItem | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const addFiles = useCallback((files: FileList | File[]) => {
@@ -81,7 +84,7 @@ export default function Home() {
   const handleProcessItem = async (item: BatchItem) => {
     try {
       setItems((prev) =>
-        prev.map((it) => (it.id === item.id ? { ...it, status: "processing", progress: 20 } : it))
+        prev.map((it) => (it.id === item.id ? { ...it, status: "processing", progress: 25 } : it))
       );
 
       const reader = new FileReader();
@@ -93,7 +96,7 @@ export default function Home() {
       const base64 = await base64Promise;
 
       setItems((prev) =>
-        prev.map((it) => (it.id === item.id ? { ...it, progress: 40 } : it))
+        prev.map((it) => (it.id === item.id ? { ...it, progress: 50 } : it))
       );
 
       const res = await fetch("/api/upscale", {
@@ -203,79 +206,86 @@ export default function Home() {
   const completedCount = items.filter((it) => it.status === "completed").length;
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col font-sans">
-      <header className="h-16 border-b border-neutral-800 px-6 flex items-center justify-between bg-neutral-900/50 backdrop-blur">
+    <div className="min-h-screen bg-[#09090b] text-neutral-100 flex flex-col font-sans selection:bg-cyan-500/30">
+      {/* Header */}
+      <header className="h-16 border-b border-neutral-800/80 px-6 flex items-center justify-between bg-[#09090b]/80 backdrop-blur sticky top-0 z-30">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-500 to-indigo-500 flex items-center justify-center shadow-lg shadow-cyan-500/20">
-            <Sparkles className="w-5 h-5 text-white" />
+          <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+            <Sparkles className="w-4 h-4" />
           </div>
           <div>
-            <h1 className="text-base font-bold tracking-tight">Batch Upscaler AI</h1>
-            <p className="text-xs text-neutral-400">RunPod Serverless 4K GPU Turbo</p>
+            <span className="text-sm font-semibold tracking-tight text-white">Batch Upscaler</span>
+            <span className="text-[11px] text-neutral-400 ml-2 font-mono bg-neutral-800/60 px-1.5 py-0.5 rounded">Real-ESRGAN 4K</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1.5 bg-neutral-900 border border-neutral-800 rounded-xl p-1 text-xs">
+        {/* Global Controls & Social */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center bg-neutral-900 border border-neutral-800 rounded-lg p-0.5 text-xs">
             <button
               onClick={() => setScale(2)}
               className={
                 scale === 2
-                  ? "px-3 py-1.5 rounded-lg font-medium transition bg-neutral-800 text-cyan-400 shadow-sm"
-                  : "px-3 py-1.5 rounded-lg font-medium transition text-neutral-400 hover:text-white"
+                  ? "px-2.5 py-1 rounded-md font-medium transition bg-neutral-800 text-cyan-400 shadow-sm"
+                  : "px-2.5 py-1 rounded-md font-medium transition text-neutral-400 hover:text-white"
               }
             >
-              2x (2K)
+              2x
             </button>
             <button
               onClick={() => setScale(4)}
               className={
                 scale === 4
-                  ? "px-3 py-1.5 rounded-lg font-medium transition bg-neutral-800 text-cyan-400 shadow-sm"
-                  : "px-3 py-1.5 rounded-lg font-medium transition text-neutral-400 hover:text-white"
+                  ? "px-2.5 py-1 rounded-md font-medium transition bg-neutral-800 text-cyan-400 shadow-sm"
+                  : "px-2.5 py-1 rounded-md font-medium transition text-neutral-400 hover:text-white"
               }
             >
-              4x (4K UHD)
+              4x UHD
             </button>
           </div>
 
-          <label className="flex items-center gap-2 text-xs text-neutral-300 cursor-pointer select-none bg-neutral-900 border border-neutral-800 px-3 py-1.5 rounded-xl hover:bg-neutral-800 transition">
+          <label className="flex items-center gap-1.5 text-xs text-neutral-300 cursor-pointer select-none bg-neutral-900 border border-neutral-800 px-2.5 py-1 rounded-lg hover:bg-neutral-800/80 transition">
             <input
               type="checkbox"
               checked={faceEnhance}
               onChange={(e) => setFaceEnhance(e.target.checked)}
-              className="rounded accent-cyan-500"
+              className="rounded accent-cyan-500 w-3.5 h-3.5"
             />
             Face Fix
           </label>
 
-          <label className="flex items-center gap-2 text-xs text-neutral-300 cursor-pointer select-none bg-neutral-900 border border-neutral-800 px-3 py-1.5 rounded-xl hover:bg-neutral-800 transition">
+          <label className="flex items-center gap-1.5 text-xs text-neutral-300 cursor-pointer select-none bg-neutral-900 border border-neutral-800 px-2.5 py-1 rounded-lg hover:bg-neutral-800/80 transition">
             <input
               type="checkbox"
               checked={removeBg}
               onChange={(e) => setRemoveBg(e.target.checked)}
-              className="rounded accent-cyan-500"
+              className="rounded accent-cyan-500 w-3.5 h-3.5"
             />
             Remove BG
           </label>
 
-          {items.length > 0 && (
-            <button
-              onClick={handleClearAll}
-              className="text-xs text-neutral-400 hover:text-rose-400 px-2 py-1.5 transition"
-            >
-              Clear
-            </button>
-          )}
+          <a
+            href="https://github.com/effame/batch-upscaler"
+            target="_blank"
+            rel="noreferrer"
+            className="p-1.5 rounded-lg border border-neutral-800 hover:bg-neutral-800 text-neutral-400 hover:text-white transition ml-1"
+            title="GitHub Repository"
+          >
+            <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+              <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
+            </svg>
+          </a>
         </div>
       </header>
 
-      <main className="flex-1 max-w-6xl w-full mx-auto p-6 flex flex-col gap-6">
+      {/* Main Container */}
+      <main className="flex-1 max-w-5xl w-full mx-auto p-6 flex flex-col gap-5">
+        {/* Clean Minimal Dropzone */}
         <div
           onDragOver={(e) => e.preventDefault()}
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
-          className="border-2 border-dashed border-neutral-800 hover:border-cyan-500/50 bg-neutral-900/30 hover:bg-neutral-900/60 transition-all rounded-3xl p-8 flex flex-col items-center justify-center gap-3 cursor-pointer group shadow-xl"
+          className="border border-dashed border-neutral-800 hover:border-cyan-500/50 bg-neutral-900/20 hover:bg-neutral-900/50 transition-all rounded-2xl p-10 flex flex-col items-center justify-center gap-2.5 cursor-pointer group"
         >
           <input
             type="file"
@@ -285,57 +295,64 @@ export default function Home() {
             accept="image/*"
             className="hidden"
           />
-          <div className="w-14 h-14 rounded-2xl bg-neutral-800 group-hover:bg-cyan-500/10 group-hover:text-cyan-400 flex items-center justify-center transition text-neutral-400">
-            <UploadCloud className="w-7 h-7" />
+          <div className="w-11 h-11 rounded-xl bg-neutral-800/80 group-hover:bg-cyan-500/10 group-hover:text-cyan-400 flex items-center justify-center transition text-neutral-400">
+            <UploadCloud className="w-5 h-5" />
           </div>
           <div className="text-center">
-            <p className="text-sm font-semibold text-neutral-200">
-              ลากรูปภาพมาวางที่นี่ หรือ <span className="text-cyan-400 underline">คลิกเพื่อเลือกไฟล์</span>
+            <p className="text-xs font-medium text-neutral-200">
+              ลากรูปภาพมาวางที่นี่ หรือ <span className="text-cyan-400 hover:underline">คลิกเพื่อเลือกไฟล์</span>
             </p>
-            <p className="text-xs text-neutral-500 mt-1">
-              รองรับไฟล์ JPG, PNG, WebP — ส่งพร้อมกันทีละ 10 ถึง 50 ภาพได้สบายๆ
+            <p className="text-[11px] text-neutral-400 mt-0.5">
+              รองรับทีละหลายรูปพร้อมกัน (10-50+ ภาพ) • JPG, PNG, WebP
             </p>
           </div>
         </div>
 
+        {/* Action Header Bar */}
         {items.length > 0 && (
-          <div className="flex items-center justify-between bg-neutral-900 border border-neutral-800 rounded-2xl p-4 shadow-lg">
+          <div className="flex items-center justify-between bg-neutral-900/60 border border-neutral-800/80 rounded-xl px-4 py-2.5">
             <div className="flex items-center gap-3">
-              <span className="text-sm font-medium text-neutral-300">
-                ทั้งหมด {items.length} ภาพ
+              <span className="text-xs font-medium text-neutral-300">
+                {items.length} รายการ
               </span>
-              <span className="text-xs text-neutral-500">|</span>
+              <span className="text-neutral-700 text-xs">/</span>
               <span className="text-xs text-emerald-400 font-medium">
-                เสร็จสิ้นแล้ว {completedCount}/{items.length}
+                เสร็จแล้ว {completedCount}
               </span>
+              <button
+                onClick={handleClearAll}
+                className="text-[11px] text-neutral-400 hover:text-rose-400 ml-2 transition"
+              >
+                ล้างทั้งหมด
+              </button>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               {completedCount > 0 && (
                 <button
                   onClick={handleDownloadAllZip}
                   disabled={isZipping}
-                  className="flex items-center gap-2 bg-neutral-800 hover:bg-neutral-700 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition shadow"
+                  className="flex items-center gap-1.5 bg-neutral-800 hover:bg-neutral-700 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition"
                 >
-                  {isZipping ? <Loader2 className="w-4 h-4 animate-spin" /> : <Archive className="w-4 h-4 text-cyan-400" />}
-                  Download All as ZIP ({completedCount})
+                  {isZipping ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Archive className="w-3.5 h-3.5 text-cyan-400" />}
+                  Download ZIP ({completedCount})
                 </button>
               )}
 
               <button
                 onClick={handleStartBatch}
                 disabled={isBatchProcessing || items.every((it) => it.status === "completed")}
-                className="flex items-center gap-2 bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 disabled:opacity-50 text-white text-xs font-bold px-5 py-2.5 rounded-xl transition shadow-lg shadow-cyan-500/20"
+                className="flex items-center gap-1.5 bg-cyan-500 hover:bg-cyan-400 disabled:opacity-50 text-neutral-950 text-xs font-semibold px-4 py-1.5 rounded-lg transition shadow-sm"
               >
                 {isBatchProcessing ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    กำลังประมวลผลบน GPU...
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    กำลังประมวลผล...
                   </>
                 ) : (
                   <>
-                    <Sparkles className="w-4 h-4" />
-                    เริ่ม Upscale ทั้งหมด ({items.filter((it) => it.status !== "completed").length})
+                    <Sparkles className="w-3.5 h-3.5" />
+                    เริ่มขยายทั้งหมด ({items.filter((it) => it.status !== "completed").length})
                   </>
                 )}
               </button>
@@ -343,13 +360,20 @@ export default function Home() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {/* Clean Items Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
           {items.map((item) => (
             <div
               key={item.id}
-              className="bg-neutral-900 border border-neutral-800 rounded-2xl p-3 flex gap-3 relative overflow-hidden group shadow-md"
+              className="bg-neutral-900/40 border border-neutral-800/80 hover:border-neutral-700/80 rounded-xl p-2.5 flex gap-3 relative overflow-hidden group transition"
             >
-              <div className="w-24 h-24 rounded-xl bg-neutral-950 shrink-0 overflow-hidden relative border border-neutral-800">
+              {/* Thumbnail Container */}
+              <div 
+                onClick={() => item.upscaledBase64 && setPreviewModalItem(item)}
+                className={`w-20 h-20 rounded-lg bg-neutral-950 shrink-0 overflow-hidden relative border border-neutral-800/80 ${
+                  item.upscaledBase64 ? "cursor-pointer group/thumb" : ""
+                }`}
+              >
                 <img
                   src={item.upscaledBase64 || item.previewUrl}
                   alt={item.name}
@@ -357,46 +381,53 @@ export default function Home() {
                 />
                 {item.status === "processing" && (
                   <div className="absolute inset-0 bg-neutral-950/70 backdrop-blur-xs flex items-center justify-center">
-                    <Loader2 className="w-6 h-6 text-cyan-400 animate-spin" />
+                    <Loader2 className="w-5 h-5 text-cyan-400 animate-spin" />
+                  </div>
+                )}
+                {item.upscaledBase64 && (
+                  <div className="absolute inset-0 bg-neutral-950/40 opacity-0 group-hover/thumb:opacity-100 transition flex items-center justify-center text-white">
+                    <Maximize2 className="w-4 h-4" />
                   </div>
                 )}
               </div>
 
-              <div className="flex-1 flex flex-col justify-between overflow-hidden">
+              {/* Info Column */}
+              <div className="flex-1 flex flex-col justify-between min-w-0 py-0.5">
                 <div>
-                  <h4 className="text-xs font-semibold text-neutral-200 truncate" title={item.name}>
+                  <h4 className="text-xs font-medium text-neutral-200 truncate" title={item.name}>
                     {item.name}
                   </h4>
-                  <div className="text-[11px] text-neutral-500 mt-0.5">
+                  <p className="text-[11px] text-neutral-400 font-mono mt-0.5">
                     {item.originalWidth ? `${item.originalWidth}×${item.originalHeight}` : "—"}
                     {item.upscaledWidth && (
-                      <span className="text-cyan-400 font-medium ml-1">
-                        → {item.upscaledWidth}×{item.upscaledHeight} ({scale}x)
+                      <span className="text-cyan-400 ml-1">
+                        → {item.upscaledWidth}×{item.upscaledHeight}
                       </span>
                     )}
-                  </div>
+                  </p>
                 </div>
 
+                {/* Status & Actions */}
                 <div className="flex items-center justify-between mt-2">
                   <div>
                     {item.status === "idle" && (
-                      <span className="text-[11px] text-neutral-500 font-medium">รอคิว</span>
+                      <span className="text-[11px] text-neutral-400">รอเริ่ม</span>
                     )}
                     {item.status === "processing" && (
-                      <span className="text-[11px] text-cyan-400 font-medium flex items-center gap-1">
-                        กำลังรัน GPU ({item.progress}%)
+                      <span className="text-[11px] text-cyan-400 flex items-center gap-1 font-medium">
+                        รัน GPU ({item.progress}%)
                       </span>
                     )}
                     {item.status === "completed" && (
-                      <span className="text-[11px] text-emerald-400 font-medium flex items-center gap-1">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        เสร็จสิ้น
+                      <span className="text-[11px] text-emerald-400 flex items-center gap-1 font-medium">
+                        <CheckCircle2 className="w-3 h-3" />
+                        สำเร็จ
                       </span>
                     )}
                     {item.status === "error" && (
-                      <span className="text-[11px] text-rose-400 font-medium flex items-center gap-1" title={item.error}>
-                        <AlertCircle className="w-3.5 h-3.5" />
-                        เกิดข้อผิดพลาด
+                      <span className="text-[11px] text-rose-400 flex items-center gap-1" title={item.error}>
+                        <AlertCircle className="w-3 h-3" />
+                        ผิดพลาด
                       </span>
                     )}
                   </div>
@@ -405,18 +436,18 @@ export default function Home() {
                     {item.status === "completed" && item.upscaledBase64 && (
                       <button
                         onClick={() => handleDownloadSingle(item)}
-                        className="p-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white transition"
-                        title="ดาวน์โหลด"
+                        className="p-1 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white transition"
+                        title="ดาวน์โหลดภาพนี้"
                       >
-                        <Download className="w-3.5 h-3.5" />
+                        <Download className="w-3 h-3" />
                       </button>
                     )}
                     <button
                       onClick={() => handleRemoveItem(item.id)}
-                      className="p-1.5 rounded-lg hover:bg-rose-500/10 text-neutral-500 hover:text-rose-400 transition"
+                      className="p-1 rounded hover:bg-rose-500/10 text-neutral-400 hover:text-rose-400 transition"
                       title="ลบ"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="w-3 h-3" />
                     </button>
                   </div>
                 </div>
@@ -425,6 +456,41 @@ export default function Home() {
           ))}
         </div>
       </main>
+
+      {/* Lightbox / Preview Modal */}
+      {previewModalItem && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-neutral-900 border border-neutral-800 rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+            <div className="h-12 border-b border-neutral-800 px-4 flex items-center justify-between">
+              <span className="text-xs font-semibold text-neutral-300 truncate">
+                {previewModalItem.name} ({previewModalItem.upscaledWidth}×{previewModalItem.upscaledHeight})
+              </span>
+              <button
+                onClick={() => setPreviewModalItem(null)}
+                className="p-1.5 rounded-lg hover:bg-neutral-800 text-neutral-400 hover:text-white transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-neutral-950">
+              <img
+                src={previewModalItem.upscaledBase64 || previewModalItem.previewUrl}
+                alt={previewModalItem.name}
+                className="max-h-[70vh] object-contain rounded-lg"
+              />
+            </div>
+            <div className="h-14 border-t border-neutral-800 px-4 flex items-center justify-end">
+              <button
+                onClick={() => handleDownloadSingle(previewModalItem)}
+                className="flex items-center gap-1.5 bg-cyan-500 hover:bg-cyan-400 text-neutral-950 text-xs font-semibold px-4 py-2 rounded-lg transition"
+              >
+                <Download className="w-3.5 h-3.5" />
+                ดาวน์โหลดภาพนี้
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

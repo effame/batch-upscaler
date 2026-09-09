@@ -1,36 +1,64 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ⚡ Batch Upscaler AI
 
-## Getting Started
+[![CI Build Check](https://github.com/effame/batch-upscaler/actions/workflows/ci.yml/badge.svg)](https://github.com/effame/batch-upscaler/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Next.js 16](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org/)
+[![RunPod Serverless](https://img.shields.io/badge/RunPod-Serverless%20GPU-purple)](https://runpod.io/)
 
-First, run the development server:
+A fast, lightweight, and open-source batch image upscaling web tool powered by **RunPod Serverless GPU (Real-ESRGAN)**.
 
+Upload 10 to 50+ images at once, upscale to 4K UHD, fix faces, remove backgrounds, and download everything as a single ZIP file in one click.
+
+---
+
+## ✨ Features
+
+- 🚀 **Batch Processing**: Drag & drop 10–50+ images simultaneously.
+- 🔍 **Ultra-Sharp 4K**: Powered by Real-ESRGAN (2x & 4x scaling).
+- 👤 **Face Fix (GFPGAN)**: Restore and enhance facial details automatically.
+- ✂️ **Background Removal**: Clean alpha cutout powered by Rembg.
+- 📦 **1-Click ZIP Download**: Package all upscaled images into a single `.zip`.
+- 🔒 **Zero Data Retention**: Pure client-to-GPU tool. No databases, no login, no accounts required.
+
+---
+
+## 🛠️ Tech Stack
+
+- **Frontend**: Next.js 16 (App Router), React 19, TypeScript
+- **Styling**: Tailwind CSS v4, Lucide Icons
+- **Compression**: JSZip & FileSaver
+- **Backend Worker**: RunPod Serverless GPU (PyTorch, Real-ESRGAN, GFPGAN)
+
+---
+
+## 🚀 Quick Start
+
+### 1. Clone the repository
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/effame/batch-upscaler.git
+cd batch-upscaler
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Install dependencies
+```bash
+npm install
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 3. Configure Environment Variables
+Create a `.env.local` file in the root directory:
+```env
+RUNPOD_API_KEY=your_runpod_api_key
+RUNPOD_ENDPOINT_ID=your_runpod_serverless_endpoint_id
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 4. Run the development server
+```bash
+npm run dev
+```
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## 📜 License
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+This project is licensed under the [MIT License](LICENSE).
