@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { 
   UploadCloud, 
   Sparkles, 
@@ -11,7 +11,10 @@ import {
   Loader2, 
   Archive,
   Maximize2,
-  X
+  X,
+  Key,
+  ShieldCheck,
+  HelpCircle
 } from "lucide-react";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
@@ -32,6 +35,9 @@ interface BatchItem {
   upscaledHeight?: number;
 }
 
+const LOCAL_KEY_STORAGE = "batch_upscaler_runpod_key";
+const LOCAL_ENDPOINT_STORAGE = "batch_upscaler_endpoint_id";
+
 export default function Home() {
   const [items, setItems] = useState<BatchItem[]>([]);
   const [scale, setScale] = useState<number>(4);
@@ -40,7 +46,46 @@ export default function Home() {
   const [isBatchProcessing, setIsBatchProcessing] = useState<boolean>(false);
   const [isZipping, setIsZipping] = useState<boolean>(false);
   const [previewModalItem, setPreviewModalItem] = useState<BatchItem | null>(null);
+  
+  // BYOK (Bring Your Own Key) States
+  const [userApiKey, setUserApiKey] = useState<string>("");
+  const [userEndpointId, setUserEndpointId] = useState<string>("3j67gpfsvuwgy3");
+  const [showKeyModal, setShowKeyModal] = useState<boolean>(false);
+  const [keyInputTemp, setKeyInputTemp] = useState<string>("");
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Load API key from localStorage on mount
+  useEffect(() => {
+    try {
+      const savedKey = localStorage.getItem(LOCAL_KEY_STORAGE);
+      const savedEndpoint = localStorage.getItem(LOCAL_ENDPOINT_STORAGE);
+      if (savedKey) {
+        setUserApiKey(savedKey);
+        setKeyInputTemp(savedKey);
+      }
+      if (savedEndpoint) {
+        setUserEndpointId(savedEndpoint);
+      }
+    } catch (e) {
+      console.warn("Could not load from localStorage:", e);
+    }
+  }, []);
+
+  const handleSaveApiKey = () => {
+    const trimmed = keyInputTemp.trim();
+    setUserApiKey(trimmed);
+    try {
+      if (trimmed) {
+        localStorage.setItem(LOCAL_KEY_STORAGE, trimmed);
+      } else {
+        localStorage.removeItem(LOCAL_KEY_STORAGE);
+      }
+    } catch (e) {
+      console.warn("Could not save to localStorage:", e);
+    }
+    setShowKeyModal(false);
+  };
 
   const addFiles = useCallback((files: FileList | File[]) => {
     const newFiles = Array.from(files).filter((f) => f.type.startsWith("image/"));
@@ -109,12 +154,17 @@ export default function Home() {
           face_enhance: faceEnhance,
           remove_bg: removeBg,
           model: scale === 2 ? "x2plus" : "x4plus",
+          userApiKey: userApiKey.trim(),
+          userEndpointId: userEndpointId.trim(),
         }),
       });
 
       const data = await res.json();
 
       if (!res.ok || data.error) {
+        if (res.status === 401) {
+          setShowKeyModal(true);
+        }
         throw new Error(data.error || "Upscale failed");
       }
 
@@ -142,6 +192,11 @@ export default function Home() {
   };
 
   const handleStartBatch = async () => {
+    if (!userApiKey.trim()) {
+      setShowKeyModal(true);
+      return;
+    }
+
     const queue = items.filter((it) => it.status === "idle" || it.status === "error");
     if (queue.length === 0) return;
 
@@ -287,11 +342,24 @@ export default function Home() {
             Remove BG
           </label>
 
+          {/* BYOK API Key Button */}
+          <button
+            onClick={() => setShowKeyModal(true)}
+            className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg border transition ${
+              userApiKey.trim()
+                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
+                : "bg-amber-500/10 border-amber-500/30 text-amber-300 hover:bg-amber-500/20 animate-pulse"
+            }`}
+          >
+            <Key className="w-3.5 h-3.5" />
+            <span>{userApiKey.trim() ? "Key Connected" : "Set API Key"}</span>
+          </button>
+
           <a
             href="https://github.com/effame/batch-upscaler"
             target="_blank"
             rel="noreferrer"
-            className="p-1.5 rounded-lg border border-neutral-800 hover:bg-neutral-800 text-neutral-400 hover:text-white transition ml-1"
+            className="p-1.5 rounded-lg border border-neutral-800 hover:bg-neutral-800 text-neutral-400 hover:text-white transition"
             title="GitHub Repository"
           >
             <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
@@ -509,6 +577,75 @@ export default function Home() {
               >
                 <Download className="w-3.5 h-3.5" />
                 ดาวน์โหลดภาพนี้
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* BYOK Settings Modal */}
+      {showKeyModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-neutral-900 border border-neutral-800 rounded-2xl max-w-md w-full p-6 flex flex-col gap-4 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+                  <Key className="w-4 h-4" />
+                </div>
+                <h3 className="text-sm font-semibold text-white">ตั้งค่า RunPod API Key (BYOK)</h3>
+              </div>
+              <button
+                onClick={() => setShowKeyModal(false)}
+                className="p-1.5 rounded-lg hover:bg-neutral-800 text-neutral-400 hover:text-white transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="text-xs text-neutral-400 flex flex-col gap-2">
+              <p>
+                เว็บนี้เป็นเครื่องมือ Open-Source แบบ <strong className="text-neutral-200">Bring Your Own Key</strong> เพื่อความปลอดภัยและประหยัดค่าใช้จ่ายของคุณ
+              </p>
+              <div className="flex items-start gap-1.5 text-neutral-400 bg-neutral-950 p-2.5 rounded-xl border border-neutral-800">
+                <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                <span>Key จะถูกบันทึกไว้ในเบราว์เซอร์ของคุณเท่านั้น (LocalStorage) จะไม่ถูกเก็บลงฐานข้อมูลใดๆ ทั้งสิ้น</span>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-neutral-300">RunPod API Key (rpa_...)</label>
+              <input
+                type="password"
+                value={keyInputTemp}
+                onChange={(e) => setKeyInputTemp(e.target.value)}
+                placeholder="rpa_xxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder:text-neutral-600 focus:outline-none focus:border-cyan-500/50 font-mono"
+              />
+              <p className="text-[11px] text-neutral-400">
+                หาได้จาก{" "}
+                <a
+                  href="https://www.runpod.io/console/serverless/user/settings"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-cyan-400 hover:underline"
+                >
+                  RunPod User Settings ↗
+                </a>
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 mt-2">
+              <button
+                onClick={() => setShowKeyModal(false)}
+                className="px-3 py-1.5 text-xs text-neutral-400 hover:text-white transition"
+              >
+                ยกเลิก
+              </button>
+              <button
+                onClick={handleSaveApiKey}
+                className="px-4 py-1.5 bg-cyan-500 hover:bg-cyan-400 text-neutral-950 text-xs font-semibold rounded-xl transition"
+              >
+                บันทึก Key
               </button>
             </div>
           </div>

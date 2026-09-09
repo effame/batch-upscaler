@@ -4,17 +4,29 @@ export const maxDuration = 60; // Allow long-running GPU operations
 
 export async function POST(req: NextRequest) {
   try {
-    const { image, scale = 4, face_enhance = false, remove_bg = false, model = "x4plus" } = await req.json();
+    const { 
+      image, 
+      scale = 4, 
+      face_enhance = false, 
+      remove_bg = false, 
+      model = "x4plus",
+      userApiKey,
+      userEndpointId
+    } = await req.json();
 
     if (!image) {
       return NextResponse.json({ error: "No image provided" }, { status: 400 });
     }
 
-    const apiKey = process.env.RUNPOD_API_KEY;
-    const endpointId = process.env.RUNPOD_ENDPOINT_ID || "3j67gpfsvuwgy3";
+    // Prioritize user's own RunPod API Key, fallback to server key if configured
+    const apiKey = (userApiKey && userApiKey.trim()) || process.env.RUNPOD_API_KEY;
+    const endpointId = (userEndpointId && userEndpointId.trim()) || process.env.RUNPOD_ENDPOINT_ID || "3j67gpfsvuwgy3";
 
     if (!apiKey) {
-      return NextResponse.json({ error: "Server missing RUNPOD_API_KEY" }, { status: 500 });
+      return NextResponse.json(
+        { error: "กรุณาใส่ RunPod API Key ของคุณในเมนู Settings ก่อนเริ่มใช้งานครับ (BYOK)" }, 
+        { status: 401 }
+      );
     }
 
     // Generate unique R2 key so the RunPod worker can upload directly to Cloudflare R2
