@@ -24,6 +24,7 @@ interface BatchItem {
   status: "idle" | "processing" | "completed" | "error";
   error?: string;
   progress: number;
+  r2Url?: string;
   upscaledBase64?: string;
   originalWidth?: number;
   originalHeight?: number;
@@ -124,7 +125,7 @@ export default function Home() {
                 ...it,
                 status: "completed",
                 progress: 100,
-                upscaledBase64: data.image,
+                r2Url: data.r2Url,
                 upscaledWidth: data.width,
                 upscaledHeight: data.height,
               }
@@ -163,23 +164,33 @@ export default function Home() {
   };
 
   const handleDownloadAllZip = async () => {
-    const completed = items.filter((it) => it.status === "completed" && it.upscaledBase64);
+    const completed = items.filter((it) => it.status === "completed" && (it.r2Url || it.upscaledBase64));
     if (completed.length === 0) return;
 
     setIsZipping(true);
     try {
       const zip = new JSZip();
 
-      completed.forEach((it) => {
-        const base64Data = it.upscaledBase64!.split(",")[1] || it.upscaledBase64!;
-        const ext = removeBg ? "png" : "jpg";
-        const dotIdx = it.name.lastIndexOf(".");
-        const rawName = dotIdx !== -1 ? it.name.substring(0, dotIdx) : it.name;
-        zip.file(`${rawName}_${scale}x.${ext}`, base64Data, { base64: true });
-      });
+      await Promise.all(
+        completed.map(async (it) => {
+          const ext = removeBg ? "png" : "jpg";
+          const dotIdx = it.name.lastIndexOf(".");
+          const rawName = dotIdx !== -1 ? it.name.substring(0, dotIdx) : it.name;
+          const filename = `${rawName}_${scale}x.${ext}`;
 
-      const blob = await zip.generateAsync({ type: "blob" });
-      saveAs(blob, `batch_upscaled_${Date.now()}.zip`);
+          if (it.r2Url) {
+            const resp = await fetch(it.r2Url);
+            const blob = await resp.blob();
+            zip.file(filename, blob);
+          } else if (it.upscaledBase64) {
+            const base64Data = it.upscaledBase64.split(",")[1] || it.upscaledBase64;
+            zip.file(filename, base64Data, { base64: true });
+          }
+        })
+      );
+
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      saveAs(zipBlob, `batch_upscaled_${Date.now()}.zip`);
     } catch (e) {
       console.error("ZIP Error:", e);
     } finally {
@@ -187,12 +198,19 @@ export default function Home() {
     }
   };
 
-  const handleDownloadSingle = (item: BatchItem) => {
-    if (!item.upscaledBase64) return;
+  const handleDownloadSingle = async (item: BatchItem) => {
     const ext = removeBg ? "png" : "jpg";
     const dotIdx = item.name.lastIndexOf(".");
     const rawName = dotIdx !== -1 ? item.name.substring(0, dotIdx) : item.name;
-    saveAs(item.upscaledBase64, `${rawName}_${scale}x.${ext}`);
+    const filename = `${rawName}_${scale}x.${ext}`;
+
+    if (item.r2Url) {
+      const resp = await fetch(item.r2Url);
+      const blob = await resp.blob();
+      saveAs(blob, filename);
+    } else if (item.upscaledBase64) {
+      saveAs(item.upscaledBase64, filename);
+    }
   };
 
   const handleRemoveItem = (id: string) => {
@@ -215,7 +233,7 @@ export default function Home() {
           </div>
           <div>
             <span className="text-sm font-semibold tracking-tight text-white">Batch Upscaler</span>
-            <span className="text-[11px] text-neutral-400 ml-2 font-mono bg-neutral-800/60 px-1.5 py-0.5 rounded">Real-ESRGAN 4K</span>
+            <span className="text-[11px] text-neutral-400 ml-2 font-mono bg-neutral-800/60 px-1.5 py-0.5 rounded">RunPod 4K Turbo</span>
           </div>
         </div>
 
@@ -369,13 +387,13 @@ export default function Home() {
             >
               {/* Thumbnail Container */}
               <div 
-                onClick={() => item.upscaledBase64 && setPreviewModalItem(item)}
+                onClick={() => (item.r2Url || item.upscaledBase64) && setPreviewModalItem(item)}
                 className={`w-20 h-20 rounded-lg bg-neutral-950 shrink-0 overflow-hidden relative border border-neutral-800/80 ${
-                  item.upscaledBase64 ? "cursor-pointer group/thumb" : ""
+                  item.r2Url || item.upscaledBase64 ? "cursor-pointer group/thumb" : ""
                 }`}
               >
                 <img
-                  src={item.upscaledBase64 || item.previewUrl}
+                  src={item.r2Url || item.upscaledBase64 || item.previewUrl}
                   alt={item.name}
                   className="w-full h-full object-cover"
                 />
@@ -384,7 +402,7 @@ export default function Home() {
                     <Loader2 className="w-5 h-5 text-cyan-400 animate-spin" />
                   </div>
                 )}
-                {item.upscaledBase64 && (
+                {(item.r2Url || item.upscaledBase64) && (
                   <div className="absolute inset-0 bg-neutral-950/40 opacity-0 group-hover/thumb:opacity-100 transition flex items-center justify-center text-white">
                     <Maximize2 className="w-4 h-4" />
                   </div>
@@ -433,7 +451,7 @@ export default function Home() {
                   </div>
 
                   <div className="flex items-center gap-1">
-                    {item.status === "completed" && item.upscaledBase64 && (
+                    {item.status === "completed" && (item.r2Url || item.upscaledBase64) && (
                       <button
                         onClick={() => handleDownloadSingle(item)}
                         className="p-1 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white transition"
@@ -474,7 +492,7 @@ export default function Home() {
             </div>
             <div className="flex-1 overflow-auto p-4 flex items-center justify-center bg-neutral-950">
               <img
-                src={previewModalItem.upscaledBase64 || previewModalItem.previewUrl}
+                src={previewModalItem.r2Url || previewModalItem.upscaledBase64 || previewModalItem.previewUrl}
                 alt={previewModalItem.name}
                 className="max-h-[70vh] object-contain rounded-lg"
               />

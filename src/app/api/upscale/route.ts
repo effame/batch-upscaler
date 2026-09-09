@@ -17,6 +17,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Server missing RUNPOD_API_KEY" }, { status: 500 });
     }
 
+    // Generate unique R2 key so the RunPod worker can upload directly to Cloudflare R2
+    const imageFormat = remove_bg ? "png" : "jpg";
+    const randomId = Math.random().toString(36).substring(2, 12);
+    const r2Key = `upscaled/batch_${Date.now()}_${randomId}.${imageFormat}`;
+
     // Call RunPod Serverless runsync
     const url = `https://api.runpod.ai/v2/${endpointId}/runsync`;
     const response = await fetch(url, {
@@ -32,7 +37,8 @@ export async function POST(req: NextRequest) {
           face_enhance: Boolean(face_enhance),
           remove_bg: Boolean(remove_bg),
           model,
-          image_format: "jpg",
+          image_format: imageFormat,
+          r2_key: r2Key,
         },
       }),
     });
@@ -50,10 +56,10 @@ export async function POST(req: NextRequest) {
       }
       return NextResponse.json({
         success: true,
-        image: data.output.image,
-        width: data.output.width,
-        height: data.output.height,
-        fileSize: data.output.fileSize,
+        r2Url: data.output.r2Url,
+        width: data.output.output_size?.width || data.output.width,
+        height: data.output.output_size?.height || data.output.height,
+        fileSize: data.output.output_file_size || data.output.fileSize,
       });
     }
 
