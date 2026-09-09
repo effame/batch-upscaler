@@ -179,7 +179,8 @@ export default function Home() {
           const filename = `${rawName}_${scale}x.${ext}`;
 
           if (it.r2Url) {
-            const resp = await fetch(it.r2Url);
+            const proxyUrl = `/api/download?url=${encodeURIComponent(it.r2Url)}&filename=${encodeURIComponent(filename)}`;
+            const resp = await fetch(proxyUrl);
             const blob = await resp.blob();
             zip.file(filename, blob);
           } else if (it.upscaledBase64) {
@@ -205,9 +206,13 @@ export default function Home() {
     const filename = `${rawName}_${scale}x.${ext}`;
 
     if (item.r2Url) {
-      const resp = await fetch(item.r2Url);
-      const blob = await resp.blob();
-      saveAs(blob, filename);
+      const proxyUrl = `/api/download?url=${encodeURIComponent(item.r2Url)}&filename=${encodeURIComponent(filename)}`;
+      const link = document.createElement("a");
+      link.href = proxyUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     } else if (item.upscaledBase64) {
       saveAs(item.upscaledBase64, filename);
     }
